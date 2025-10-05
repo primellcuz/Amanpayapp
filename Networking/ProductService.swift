@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - Errors
 enum ProductServiceError: Error, LocalizedError {
     case invalidURL
     case invalidResponse
@@ -17,24 +16,14 @@ enum ProductServiceError: Error, LocalizedError {
     }
 }
 
-// MARK: - Pagination model (DRF style)
-private struct Page<T: Decodable>: Decodable {
-    let count: Int?
-    let next: String?
-    let previous: String?
-    let results: [T]
-}
-
-// MARK: - Service
 final class ProductService {
     static let shared = ProductService()
     private init() {}
 
-    // ✅ HTTPS domain
+    // ✅ HTTPS domen
     private let baseURL = URL(string: "https://server.loadshub.com")!
-    var base: URL { baseURL }
 
-    // Custom URLSession with timeouts
+    // Yaxshi time-out’lar bilan sessiya
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default
         cfg.waitsForConnectivity = true
@@ -43,74 +32,40 @@ final class ProductService {
         return URLSession(configuration: cfg)
     }()
 
-    // MARK: - List products
-    /// GET /api/products/?search=&ordering=&page=&page_size=
-    func list(
-        search: String? = nil,
-        ordering: String? = nil,
-        page: Int? = nil,
-        pageSize: Int? = nil
-    ) async throws -> [ProductDTO] {
-        guard var comp = URLComponents(url: baseURL.appendingPathComponent("/api/products/"),
-                                       resolvingAgainstBaseURL: false)
-        else { throw ProductServiceError.invalidURL }
+    // JSON decoder (snake_case → camelCase, ISO8601 + fractional seconds)
+    private var decoder: JSONDecoder {
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        d.dateDecodingStrategy = .custom { dec in
+            let c = try dec.singleValueContainer()
+            let s = try c.decode(String.self)
+            let f1 = ISO8601DateFormatter()
+            f1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let dt = f1.date(from: s) { return dt }
+            return ISO8601DateFormatter().date(from: s) ?? Date()
+        }
+        return d
+    }
 
-        var items: [URLQueryItem] = []
-        if let s = search?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
-            items.append(.init(name: "search", value: s))
-        }
-        if let o = ordering?.trimmingCharacters(in: .whitespacesAndNewlines), !o.isEmpty {
-            items.append(.init(name: "ordering", value: o))
-        }
-        if let p = page, p > 0 {
-            items.append(.init(name: "page", value: String(p)))
-        }
-        if let ps = pageSize, ps > 0 {
-            items.append(.init(name: "page_size", value: String(ps)))
-        }
-        if !items.isEmpty { comp.queryItems = items }
-
-        guard let url = comp.url else { throw ProductServiceError.invalidURL }
+    /// GET /api/products/  →  [ProductDTO]
+    func list() async throws -> [ProductDTO] {
+        let url = baseURL.appendingPathComponent("/api/products/")
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        // 🔐 Optional auth (agar kerak bo‘lsa)
+        // Agar endpoint auth talab qilsa, token yuborish (zarur bo‘lsa).
         if let token = TokenStore.shared.readAccess() {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let (data, resp) = try await session.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw ProductServiceError.invalidResponse }
-        guard (200...299).contains(http.statusCode) else { throw ProductServiceError.http(http.statusCode, data) }
-
-        // 🧠 Flexible decode: array yoki paginated
-        do {
-            if let arr = try? JSONDecoder().decode([ProductDTO].self, from: data) {
-                return arr
-            }
-            let page = try JSONDecoder().decode(Page<ProductDTO>.self, from: data)
-            return page.results
-        } catch {
-            throw ProductServiceError.decoding(error)
+        guard (200...299).contains(http.statusCode) else {
+            throw ProductServiceError.http(http.statusCode, data)
         }
-    }
 
-    // MARK: - Get single product
-    /// GET /api/products/{id}/
-    func get(id: Int) async throws -> ProductDTO {
-        let url = baseURL.appendingPathComponent("/api/products/\(id)/")
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        if let token = TokenStore.shared.readAccess() {
-            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (data, resp) = try await session.data(for: req)
-        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw ProductServiceError.invalidResponse
-        }
-        return try JSONDecoder().decode(ProductDTO.self, from: data)
+        do { return try decoder.decode([ProductDTO].self, from: data) }
+        catch { throw ProductServiceError.decoding(error) }
     }
 }

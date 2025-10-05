@@ -4,13 +4,15 @@ import Combine
 import UIKit
 
 struct SplashView: View {
+    @EnvironmentObject private var session: SessionManager   // ✅ shu qatordan foydalanyapmiz
+
     @State private var logoOpacity: Double = 0.0
     @State private var logoScale: CGFloat = 0.88
     @State private var haloPulse = false
     @State private var sweepOffset: CGFloat = -160
     @State private var grainOpacity: Double = 0.0
 
-    @StateObject private var haptics = HapticsManager()  // 🔔
+    @StateObject private var haptics = HapticsManager()
 
     var body: some View {
         ZStack {
@@ -83,16 +85,13 @@ struct SplashView: View {
             withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: false)) {
                 sweepOffset = 160
             }
-
-            // 🔔 Haptics
-            haptics.prepare()
-            // Haptics
             haptics.prepare()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 haptics.playPremiumSplash()
             }
-
         }
+        .onDisappear { haptics.stop() }
+        .task { await session.bootstrap(minimumSeconds: 2.0) }
     }
 }
 
@@ -316,5 +315,6 @@ private struct NoiseGenerator {
 
 #Preview {
     SplashView()
+        .environmentObject(SessionManager())   // ✅
         .preferredColorScheme(.light)
 }

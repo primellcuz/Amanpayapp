@@ -193,4 +193,5 @@ struct LoginView: View {
         LoginView().environmentObject(SessionManager())
     }
     .preferredColorScheme(.light)
+    .environmentObject(SessionManager())
 }

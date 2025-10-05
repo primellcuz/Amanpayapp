@@ -4,12 +4,18 @@ struct ProfileTabView: View {
     @EnvironmentObject private var session: SessionManager
     @EnvironmentObject private var lock: AppLockManager
 
-    @AppStorage("pushEnabled") private var pushEnabled: Bool = true
-    @AppStorage("biometricEnabled") private var biometricEnabled: Bool = false
-    @AppStorage("appLanguage") private var appLanguage: String = "O‘zbek"
-
     @State private var showLogoutConfirm = false
-    @State private var showLanguagePicker = false
+
+    // ❗️BU YERDA $lock YO‘Q. Faqat lock ishlatiladi:
+    private var biometricBinding: SwiftUI.Binding<Bool> {
+        SwiftUI.Binding(
+            get: { self.lock.biometricEnabled },
+            set: { newValue in
+                self.lock.biometricEnabled = newValue
+            }
+        )
+    }
+
 
     var body: some View {
         NavigationStack {
@@ -35,8 +41,10 @@ struct ProfileTabView: View {
                         showLogoutConfirm = true
                     } label: {
                         HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right").imageScale(.medium)
-                            Text("Chiqish").font(.system(size: 17, weight: .semibold, design: .rounded))
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .imageScale(.medium)
+                            Text("Chiqish")
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -51,7 +59,9 @@ struct ProfileTabView: View {
             }
             .navigationTitle("Profil")
             .navigationBarTitleDisplayMode(.inline)
-            .confirmationDialog("Chiqishni tasdiqlang", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+            .confirmationDialog("Chiqishni tasdiqlang",
+                                isPresented: $showLogoutConfirm,
+                                titleVisibility: .visible) {
                 Button("Ha, chiqish", role: .destructive) {
                     UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                     session.logout()
@@ -73,11 +83,13 @@ struct ProfileTabView: View {
                     )
                 )
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(displayName(
-                        first: session.currentUser?.first_name,
-                        last: session.currentUser?.last_name,
-                        phone: session.currentUser?.phone_number
-                    ))
+                    Text(
+                        displayName(
+                            first: session.currentUser?.first_name,
+                            last: session.currentUser?.last_name,
+                            phone: session.currentUser?.phone_number
+                        )
+                    )
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
 
                     if let phone = session.currentUser?.phone_number {
@@ -106,7 +118,10 @@ struct ProfileTabView: View {
         )
         .background(.white.opacity(0.75))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.black.opacity(0.06), lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+        )
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
         .padding(.horizontal, 16)
     }
@@ -116,16 +131,20 @@ struct ProfileTabView: View {
         VStack(spacing: 0) {
             SectionHeader(text: "Sozlamalar")
 
-            ToggleRow(icon: "faceid", tint: .green, title: "Biometrik qulflov", isOn: Binding(
-                get: { lock.biometricEnabled },
-                set: { lock.setBiometricEnabled($0) }
-            ))
+            ToggleRow(
+                icon: "faceid",
+                tint: .green,
+                title: "Biometrik qulflov",
+                isOn: biometricBinding   // ✅ shu Binding
+            )
             Divider().padding(.leading, 56)
 
             NavigationLink {
                 SetupPinView().environmentObject(lock)
             } label: {
-                Row(icon: "key.horizontal.fill", tint: .blue, title: "PIN-kod",
+                Row(icon: "key.horizontal.fill",
+                    tint: .blue,
+                    title: "PIN-kod",
                     value: PinStore.shared.exists ? "\(lock.pinLength) raqam" : "O‘rnatilmagan")
             }
         }
@@ -133,7 +152,7 @@ struct ProfileTabView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 6)
         .padding(.horizontal, 16)
-    } // ✅ shu qavs yetishmagan edi
+    }
 
     // MARK: - Support
     private var supportCard: some View {
@@ -171,7 +190,7 @@ struct ProfileTabView: View {
     private func displayName(first: String?, last: String?, phone: String?) -> String {
         let f = (first ?? "").trimmingCharacters(in: .whitespaces)
         let l = (last ?? "").trimmingCharacters(in: .whitespaces)
-        if !f.isEmpty || !l.isEmpty { return [f, l].filter{ !$0.isEmpty }.joined(separator: " ") }
+        if !f.isEmpty || !l.isEmpty { return [f, l].filter { !$0.isEmpty }.joined(separator: " ") }
         return formatPhoneE164(phone ?? "+998")
     }
 
@@ -197,7 +216,8 @@ struct ProfileTabView: View {
     .preferredColorScheme(.light)
 }
 
-// MARK: - Reusable UI Pieces (changes not required from your version)
+// MARK: - Reusable UI Pieces
+
 private struct AvatarView: View {
     let initials: String
     var body: some View {
@@ -244,7 +264,9 @@ private struct SectionHeader: View {
     let text: String
     var body: some View {
         HStack {
-            Text(text).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            Text(text)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(.horizontal, 16)
@@ -261,7 +283,8 @@ private struct Row: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(tint.opacity(0.12))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(tint.opacity(0.12))
                 Image(systemName: icon).foregroundStyle(tint)
             }
             .frame(width: 36, height: 36)
@@ -284,7 +307,8 @@ private struct ToggleRow: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(tint.opacity(0.12))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(tint.opacity(0.12))
                 Image(systemName: icon).foregroundStyle(tint)
             }
             .frame(width: 36, height: 36)
@@ -298,20 +322,8 @@ private struct ToggleRow: View {
     }
 }
 
-private struct ButtonRow: View {
-    let icon: String
-    let tint: Color
-    let title: String
-    var value: String? = nil
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            Row(icon: icon, tint: tint, title: title, value: value)
-        }
-    }
-}
-
 // MARK: - Stubs
+
 private struct PersonalInfoView: View {
     let user: UserDTO?
     var body: some View {
@@ -332,8 +344,7 @@ private struct CardsPlaceholderView: View {
         VStack(spacing: 12) {
             Image(systemName: "creditcard.fill").font(.system(size: 46)).foregroundStyle(.secondary)
             Text("Kartalar bo‘limi tez orada").font(.headline)
-            Text("Hozircha tizimga karta qo‘shish yoqilmagan.")
-                .font(.subheadline).foregroundStyle(.secondary)
+            Text("Hozircha tizimga karta qo‘shish yoqilmagan.").font(.subheadline).foregroundStyle(.secondary)
         }
         .padding()
         .navigationTitle("To‘lov kartalari")
@@ -369,3 +380,4 @@ private struct AboutView: View {
         .navigationTitle("Biz haqimizda")
     }
 }
+

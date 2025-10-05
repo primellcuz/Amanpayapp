@@ -153,4 +153,5 @@ private struct Shop: Identifiable {
 #Preview {
     ShopsTabView()
         .preferredColorScheme(.light)
+        .environmentObject(SessionManager())
 }

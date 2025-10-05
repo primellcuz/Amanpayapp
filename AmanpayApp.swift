@@ -1,4 +1,5 @@
 import SwiftUI
+
 @main
 struct AmanpayApp: App {
     @StateObject private var session = SessionManager()
@@ -8,6 +9,7 @@ struct AmanpayApp: App {
         WindowGroup {
             RootRouter()
                 .environmentObject(session)
+                .environmentObject(lock)               // ✅ add this line
                 .preferredColorScheme(.light)
         }
     }
